@@ -295,6 +295,8 @@ class MFRC522 {
     this.writeRegister(CMD.BitFramingReg, 0x00);
     const uid = [CMD.PICC_ANTICOLL, 0x20];
     let response = this.toCard(CMD.PCD_TRANSCEIVE, uid);
+    let uid_arr = [];
+    
     if (response.status) {
       let uidCheck = 0;
       for (let i = 0; i < 4; i++) {
@@ -304,7 +306,35 @@ class MFRC522 {
         response.status = ERROR;
       }
     }
-    return { status: response.status, data: response.data };
+    
+    if (response.status != ERROR) {
+      for(let i = 0; i < 4; i++){
+        if(response.data[i] == 0x88) continue;
+        uid_arr.push(response.data[i]);
+      }
+      if(response.data[0] == 0x88){
+        let select = [CMD.PICC_SELECTTAG,0x70];
+        for(let i = 0; i < 5; i++){
+          select.push(response.data[i])
+        }
+        select = select.concat(this.calculateCRC(select));
+        let select_rsp = this.toCard(CMD.PCD_TRANSCEIVE, select);
+	      let anticoll_rsp = this.toCard(CMD.PCD_TRANSCEIVE,[0x95,0x20]);
+        let uidCheck = 0;
+        for (let i = 0; i < 4; i++) {
+          uidCheck = uidCheck ^ anticoll_rsp.data[i];
+        }
+        if (uidCheck != anticoll_rsp.data[4]) {
+          response.status = ERROR;
+        } else {
+          for(let i = 0; i < 4; i++){
+            uid_arr.push(anticoll_rsp.data[i]);
+          }
+        }
+      }
+    }
+    
+    return { status: response.status, data: uid_arr };
   }
 
   /**
@@ -354,7 +384,7 @@ class MFRC522 {
     if (response.status && response.bitSize == 0x18) {
       memoryCapacity = response.data[0];
     }
-    return memoryCapacity;
+    return [memoryCapacity,response.data];
   }
 
   /**
