@@ -384,7 +384,8 @@ class MFRC522 {
     if (response.status && response.bitSize == 0x18) {
       memoryCapacity = response.data[0];
     }
-    return [memoryCapacity,response.data];
+	  
+    return memoryCapacity;
   }
 
   /**
